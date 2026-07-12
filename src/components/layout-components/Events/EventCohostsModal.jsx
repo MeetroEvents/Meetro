@@ -19,18 +19,28 @@ const roleOptions = [
   { id: 3, name: "Speaker" },
 ];
 
+// Shape of a fresh, in-progress cohost being composed in step 1.
+// `photo`   -> existing { public_id, url } object carried over untouched (only relevant if editing, not used here)
+// `preview` -> local preview string for <Avatar> / <ImageInput> (blob URL or pasted URL)
+// `file`    -> File object if a new image was picked, else null
+const emptyCohost = {
+  email: "",
+  role: "",
+  name: "",
+  photo: null,
+  preview: "",
+  file: null,
+};
+
 export default function EventCohostsModal({ onSave, cohostsData }) {
   const { close } = useModalContext();
   const [editedCohosts, setEditedCohosts] = useState(cohostsData || []);
   const [currentStep, setCurrentStep] = useState(1);
   const [hasAccount, setHasAccount] = useState(true);
-  const [cohost, setCohost] = useState({
-    email: "",
-    role: "",
-    photo: "",
-    name: "",
-    file: null,
-  });
+  const [cohost, setCohost] = useState(emptyCohost);
+  // null while adding a brand-new cohost; holds the array index while an
+  // existing cohost from the review list is being edited.
+  const [editingIndex, setEditingIndex] = useState(null);
 
   // Validation state for form fields
   const [validation, setValidation] = useState({
@@ -71,26 +81,55 @@ export default function EventCohostsModal({ onSave, cohostsData }) {
     return isValid;
   };
 
-  // Add a new cohost to the list
+  // Add a new cohost, or save changes to the one currently being edited
   const addCohost = () => {
     if (!validateForm()) return;
-    setEditedCohosts(s => [...s, cohost]);
-    setCohost({ email: "", role: "", photo: "", name: "", file: null });
+    if (editingIndex !== null) {
+      setEditedCohosts(s => s.map((c, i) => (i === editingIndex ? cohost : c)));
+      setEditingIndex(null);
+    } else {
+      setEditedCohosts(s => [...s, cohost]);
+    }
+    setCohost(emptyCohost);
     setCurrentStep(2);
+  };
+
+  // Load an existing cohost from the review list back into the step-1 form
+  const editCohost = index => {
+    const target = editedCohosts[index];
+    setCohost({
+      email: target.email || "",
+      role: target.role || "",
+      name: target.name || "",
+      photo: target.photo || null,
+      preview: target.preview || target.photo?.url || "",
+      file: target.file || null,
+    });
+    // "No Meetro Account" cohosts are the only ones with a name/photo, since
+    // that form of the step-1 form is what collects those fields.
+    setHasAccount(!(target.name || target.photo || target.preview));
+    setEditingIndex(index);
+    setValidation({ email: "", role: "", name: "" });
+    setCurrentStep(1);
   };
 
   // Reset all data to initial state
   const resetData = () => {
     setEditedCohosts(cohostsData || []);
-    setCurrentStep(cohostsData.length > 0 ? 2 : 1);
+    setCurrentStep((cohostsData || []).length > 0 ? 2 : 1);
     setHasAccount(true);
     setValidation({ email: "", role: "", name: "" });
-    setCohost({ email: "", role: "", photo: "", name: "", file: null });
+    setCohost(emptyCohost);
+    setEditingIndex(null);
   };
 
   // Remove a cohost from the list by index
   const removeCohost = index => {
     setEditedCohosts(s => s.filter((_, i) => i !== index));
+    if (editingIndex === index) {
+      setEditingIndex(null);
+      setCohost(emptyCohost);
+    }
     if (editedCohosts.length === 1) {
       setHasAccount(true);
       setCurrentStep(1);
@@ -102,12 +141,35 @@ export default function EventCohostsModal({ onSave, cohostsData }) {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
       setHasAccount(true);
+      setEditingIndex(null);
+      setCohost(emptyCohost);
     }
   };
 
-  // Save the edited cohosts and close the modal
+  // Save the edited cohosts and close the modal.
+  //
+  // cohostsToSave[i] mirrors editedCohosts[i] 1:1 by index, so the parent
+  // can attach any file at cohostImages[i] under the form field
+  // "cohostImage_<i>" and the backend will match them up correctly.
+  //
+  // - If a cohost has a new `file`, we drop the old `photo` object from the
+  //   payload (the upload will overwrite it server-side anyway).
+  // - If a cohost has no new `file` but has an existing `photo` object
+  //   (public_id + url) carried over from cohostsData, we resend it as-is
+  //   so the backend preserves it instead of deleting it.
+  // - Freshly-added cohosts with no account and no file at all (e.g. only
+  //   pasted a URL) won't have a public_id — that's expected, they're new.
   const handleSave = () => {
-    onSave?.(editedCohosts);
+    const cohostImages = editedCohosts.map(c => c.file || null);
+
+    const cohostsToSave = editedCohosts.map(
+      ({ file, preview, photo, ...rest }) => ({
+        ...rest,
+        ...(!file && photo ? { photo } : {}),
+      })
+    );
+
+    onSave?.(cohostsToSave, cohostImages);
     close();
   };
 
@@ -135,13 +197,7 @@ export default function EventCohostsModal({ onSave, cohostsData }) {
                     onClick={() => {
                       setHasAccount(true);
                       setValidation({ name: "", email: "", role: "" });
-                      setCohost({
-                        email: "",
-                        role: "",
-                        photo: "",
-                        name: "",
-                        file: null,
-                      });
+                      setCohost(emptyCohost);
                     }}
                   />
                   <TagButton
@@ -158,13 +214,7 @@ export default function EventCohostsModal({ onSave, cohostsData }) {
                         email: "",
                         role: "",
                       });
-                      setCohost({
-                        email: "",
-                        role: "",
-                        photo: "",
-                        name: "",
-                        file: null,
-                      });
+                      setCohost(emptyCohost);
                     }}
                   />
                 </div>
@@ -174,10 +224,22 @@ export default function EventCohostsModal({ onSave, cohostsData }) {
                 <ImageInput
                   size="sm"
                   onUpload={({ file, previewUrl }) =>
-                    setCohost({ ...cohost, photo: previewUrl, file })
+                    setCohost(c => ({
+                      ...c,
+                      preview: previewUrl,
+                      file,
+                      photo: null,
+                    }))
                   }
-                  imgUrl={cohost.photo}
-                  setImgUrl={value => setCohost({ ...cohost, photo: value })}
+                  imgUrl={cohost.preview}
+                  setImgUrl={value =>
+                    setCohost(c => ({
+                      ...c,
+                      preview: value,
+                      file: null,
+                      photo: null,
+                    }))
+                  }
                 />
               )}
               {/* Cohost name */}
@@ -274,7 +336,7 @@ export default function EventCohostsModal({ onSave, cohostsData }) {
                 }}
               />
               <TextButton
-                text="Add Cohost"
+                text={editingIndex !== null ? "Save Changes" : "Add Cohost"}
                 onClick={addCohost}
                 className="min-w-auto"
               />
@@ -292,10 +354,20 @@ export default function EventCohostsModal({ onSave, cohostsData }) {
                       <p className="font-bold text-[18px] leading-7">
                         Collaborator {index + 1}
                       </p>
-                      <div className="rounded-2xl flex items-center justify-between bg-white p-4">
+                      <div
+                        className="rounded-2xl flex items-center justify-between bg-white p-4 cursor-pointer"
+                        onClick={() => editCohost(index)}
+                      >
                         {/*  Cohost info */}
                         <div className="flex items-center gap-2">
-                          <Avatar src={cohost?.photo} size="sm" />
+                          <Avatar
+                            src={
+                              cohost?.preview ||
+                              cohost?.photo?.url ||
+                              cohost?.id?.photo?.url
+                            }
+                            size="sm"
+                          />
                           <div className="font-medium">
                             <p className="text-base text-[#001010]">
                               {cohost?.name || cohost.email}
@@ -309,7 +381,10 @@ export default function EventCohostsModal({ onSave, cohostsData }) {
                         <IconButton
                           variant="tertiary"
                           icon={<Trash variant="Bold" color="#DB2863" />}
-                          onClick={() => removeCohost(index)}
+                          onClick={e => {
+                            e.stopPropagation();
+                            removeCohost(index);
+                          }}
                         />
                       </div>
                     </li>

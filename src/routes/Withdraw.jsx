@@ -267,6 +267,7 @@ function Withdraw() {
         withdrawDetails={{
           withdrawalAmount,
           eventId: event?.id,
+          feeResponsibility: event?.feeResponsibility || "host", // Default to host if not provided
           ...bankDetails,
         }}
       />

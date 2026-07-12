@@ -34,6 +34,19 @@ import {
 import React, { useEffect, useState } from "react";
 import { twMerge } from "tailwind-merge";
 
+// Fallback shape for chip-in details when a user removes chip-in and might
+// re-add it later in the same session. Mirrors CreateEvent's constant.
+const initialChipInDetails = {
+  chipInType: "",
+  amount: "",
+  bankDetails: {
+    accountName: "",
+    accountNumber: "",
+    bankName: "",
+    bankCode: "",
+  },
+};
+
 function EditEvent() {
   const { event } = useManageEventContext();
   const { setActive } = useModalContext();
@@ -56,6 +69,9 @@ function EditEvent() {
   const queryClient = useQueryClient();
   // File state to hold the uploaded image file.
   const [imageFile, setImageFile] = useState(null);
+  // Cohost image files, index-matched to editedEvent.cohosts. null entries
+  // mean "no new upload for this cohost, keep their existing photo".
+  const [cohostImages, setCohostImages] = useState([]);
   // Show update count alert
   const [showUpdateAlert, setShowUpdateAlert] = useState(true);
 
@@ -85,6 +101,12 @@ function EditEvent() {
         dressCode: event.dressCode || null,
         eventType: event.eventType || "",
         meetingURL: event.meetingURL || "",
+        // NOTE: cohosts here must include the RAW photo object
+        // ({ public_id, url }), not a flattened URL string, or existing
+        // cohost photos will be lost on save. This depends on
+        // useManageEventContext fetching the event via an edit-mode
+        // endpoint that doesn't flatten cohost.photo through
+        // formatEventData's public-view shape.
         cohosts: event.cohosts || [],
         updateCount: event.updateCount || 0,
         chipInDetails: event.chipInDetails || null,
@@ -92,6 +114,7 @@ function EditEvent() {
 
       setInitialEvent(eventData);
       setEditedEvent(eventData);
+      setCohostImages((eventData.cohosts || []).map(() => null));
 
       setSettings({
         hasDescription: eventData?.description ? true : false,
@@ -107,11 +130,14 @@ function EditEvent() {
       URL.revokeObjectURL(editedEvent.image);
     }
 
-    // Also check cohosts for any blob URLs and revoke them
+    // Also check cohosts for any blob preview URLs and revoke them.
+    // cohost.photo is the { public_id, url } object from the server (or
+    // undefined) — never a blob URL. The local preview lives in
+    // cohost.preview, set by ImageInput's onUpload in EventCohostsModal.
     if (editedEvent?.cohosts?.length) {
       editedEvent.cohosts.forEach(cohost => {
-        if (cohost.photo && cohost.photo.startsWith("blob:")) {
-          URL.revokeObjectURL(cohost.photo);
+        if (cohost.preview && cohost.preview.startsWith("blob:")) {
+          URL.revokeObjectURL(cohost.preview);
         }
       });
     }
@@ -170,6 +196,7 @@ function EditEvent() {
   // Undo changes handler
   const handleUndoChanges = () => {
     setEditedEvent(initialEvent);
+    setCohostImages((initialEvent.cohosts || []).map(() => null));
     setSettings({
       hasDescription: initialEvent.description ? true : false,
       hasChipIn: initialEvent.chipInDetails ? true : false,
@@ -281,6 +308,9 @@ function EditEvent() {
         formData.append("endDate", new Date(editedEvent.endDate).toISOString());
       }
       if (settings?.hasCohosts) {
+        // Each cohost's `photo` (if kept) is the raw { public_id, url }
+        // object carried from editedEvent.cohosts — sent as-is so the
+        // backend preserves it when no new file is uploaded for that index.
         formData.append("cohosts", JSON.stringify(editedEvent.cohosts));
       }
       formData.append("category", JSON.stringify(editedEvent.category));
@@ -310,6 +340,15 @@ function EditEvent() {
       }
       if (editedEvent.dressCode) {
         formData.append("dressCode", JSON.stringify(editedEvent.dressCode));
+      }
+      // Append cohost images, one file per field named cohostImage_<index>,
+      // matching that cohost's position in editedEvent.cohosts. Cohosts
+      // with no new upload have `null` at their index and are skipped —
+      // the backend preserves their existing photo object instead.
+      if (settings?.hasCohosts && cohostImages.length > 0) {
+        cohostImages.forEach((file, index) => {
+          if (file) formData.append(`cohostImage_${index}`, file);
+        });
       }
       return eventsApi.updateEvent(event._id, formData);
     },
@@ -672,8 +711,9 @@ To keep things neat for your guests, you can only make up to 3 major edits (like
       {/* Event cohosts modal */}
       <EventCohostsModal
         cohostsData={editedEvent.cohosts}
-        onSave={newCohosts => {
+        onSave={(newCohosts, newCohostImages) => {
           setEditedEvent({ ...editedEvent, cohosts: newCohosts });
+          setCohostImages(newCohostImages);
           setValidation(prev => ({ ...prev, cohosts: "" }));
         }}
       />

@@ -244,58 +244,6 @@ export default function EventDetails() {
 
   const sharedRef = useRef(null);
 
-  const isAtPageBottom = () => {
-    const doc = document.documentElement;
-    const scrollTop = window.scrollY || doc.scrollTop;
-    const clientHeight = window.innerHeight || doc.clientHeight;
-    const scrollHeight = doc.scrollHeight;
-    return scrollTop + clientHeight >= scrollHeight - 8;
-  };
-
-  const handleMoreScroll = e => {
-    if (isMobileView && showMoreDetails) return;
-    // wheel event
-    if (e?.deltaY !== undefined) {
-      if (isAtPageBottom() && e.deltaY > 0) {
-        handleMoreDetails();
-        // Stop the scroll event from propagating further
-        e.preventDefault();
-      }
-      return;
-    }
-  };
-
-  // Handle swipe up gesture for mobile devices
-  useEffect(() => {
-    if (!isMobileView || showMoreDetails) return;
-
-    let touchStartY = null;
-
-    const onTouchStart = ev => {
-      touchStartY = ev.touches?.[0]?.clientY ?? null;
-    };
-
-    const onTouchMove = ev => {
-      if (touchStartY === null) return;
-      const currentY = ev.touches?.[0]?.clientY ?? 0;
-      const dy = touchStartY - currentY; // positive when swiping up
-      if (isAtPageBottom() && dy > 30) {
-        handleMoreDetails();
-        touchStartY = null;
-      }
-    };
-
-    window.addEventListener("wheel", handleMoreScroll, { passive: true });
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: true });
-
-    return () => {
-      window.removeEventListener("wheel", handleMoreScroll);
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchmove", onTouchMove);
-    };
-  }, [isMobileView, showMoreDetails, event]);
-
   // Loading and error states
   if (isLoading)
     return (
@@ -331,14 +279,16 @@ export default function EventDetails() {
                   variant="tertiary"
                   onClick={handleShare}
                 />
-                <Link to={`/events/${event.slug}`} className="hidden sm:flex">
-                  <TextButton
-                    rightImg={<Maximize1 variant="Bold" />}
-                    text="More details"
-                    className="min-w-0 px-2 flex h-8 text-xs sm:h-8 sm:text-xs"
-                    variant="tertiary"
-                  />
-                </Link>
+                {!isMobileView && (
+                  <Link to={`/events/${event.slug}`} className="hidden sm:flex">
+                    <TextButton
+                      rightImg={<Maximize1 variant="Bold" />}
+                      text="More details"
+                      className="min-w-0 px-2 flex h-8 text-xs sm:h-8 sm:text-xs"
+                      variant="tertiary"
+                    />
+                  </Link>
+                )}
               </div>
             </div>
             {/* Event details */}
@@ -506,7 +456,7 @@ export default function EventDetails() {
             >
               <div className="flex items-center flex-col gap-2 bg-white py-2 rounded-t-4xl">
                 <div className="text-[#8A9191] gap-2 flex justify-center items-center satoshi font-medium text-[10px] leading-3.5">
-                  Scroll or Tap for more <ArrowDown2 color="#001010" />
+                  Tap for more <ArrowDown2 color="#001010" />
                 </div>
                 <div className="h-1 w-[109px] bg-[#f0f0f0] rounded-[8px]"></div>
               </div>
@@ -622,7 +572,7 @@ export default function EventDetails() {
             </div>
 
             {/* Right content */}
-            <div className="w-full overflow-hidden  min-w-0 flex flex-col h-full  lg:min-h-[calc(100vh-52px)] bg-white/80 relative border-l border-[#E5E7E3] lg:ml-[461px] lg:w-[calc(100%-461px)] rounded-t-4xl lg:rounded-l-2xl lg:rounded-r-none">
+            <div className="w-full overflow-hidden flex-1   min-w-0 flex flex-col h-full  lg:min-h-[calc(100vh-52px)] bg-white/80 relative border-l border-[#E5E7E3] lg:ml-[461px] lg:w-[calc(100%-461px)] rounded-t-4xl lg:rounded-l-2xl lg:rounded-r-none">
               <section className="hidden sm:flex gap-6 flex-col py-6 px-10 pt-9 border-b lg:pr-20 border-[#E5E7E3] ">
                 <div className="flex gap-2 justify-between">
                   <TagButton

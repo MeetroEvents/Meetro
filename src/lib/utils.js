@@ -202,3 +202,9 @@ export const DEFAULT_EVENT_IMAGES = [
   `${imageBaseUrl}/event-ph6_s0alnz.jpg`,
   `${imageBaseUrl}/event-ph7_kpdnih.jpg`,
 ];
+// Calculate withdrawal fee
+export function calculateFee(amount) {
+  const feePercentage = 0.01;
+  const fixedFee = 100; // NGN 100 fixed fee
+  return amount * feePercentage + fixedFee;
+}

@@ -122,6 +122,7 @@ function CreateEvent() {
     chipInDetails: initialChipInDetails,
     entryCode: null,
     attendeeLimit: null,
+    cohostImages: [],
   };
 
   // Event State
@@ -180,11 +181,14 @@ function CreateEvent() {
       URL.revokeObjectURL(event.image);
     }
 
-    // Also check cohosts for any blob URLs and revoke them
+    // Also check cohosts for any blob preview URLs and revoke them.
+    // Note: cohost.photo is the { public_id, url } object from the server
+    // (or null) — it never holds a blob URL. The local preview lives in
+    // cohost.preview, set by ImageInput's onUpload in EventCohostsModal.
     if (event?.cohosts?.length) {
       event.cohosts.forEach(cohost => {
-        if (cohost.photo && cohost.photo.startsWith("blob:")) {
-          URL.revokeObjectURL(cohost.photo);
+        if (cohost.preview && cohost.preview.startsWith("blob:")) {
+          URL.revokeObjectURL(cohost.preview);
         }
       });
     }
@@ -309,10 +313,18 @@ function CreateEvent() {
         formData.append("endDate", new Date(eventData.endDate).toISOString());
       }
       if (settings?.hasCohosts) {
+        // Each cohost's `photo` (if kept) is already the raw
+        // { public_id, url } object from EventCohostsModal — sent as-is.
         formData.append("cohosts", JSON.stringify(eventData.cohosts));
       }
+      formData.append(
+        "feeResponsibility",
+        user.preferences?.eventFeesPaidBy || "host"
+      );
       formData.append("category", JSON.stringify(eventData.category));
       formData.append("eventType", eventData.eventType);
+      formData.append("isPrivate", JSON.stringify(eventData.isPrivate));
+      formData.append("isPublished", JSON.stringify(!!eventData.isPublished));
       // Append image if it exists
       if (imageFile) {
         formData.append("image", imageFile);
@@ -338,6 +350,21 @@ function CreateEvent() {
       }
       if (eventData.dressCode) {
         formData.append("dressCode", JSON.stringify(eventData.dressCode));
+      }
+      if (settings?.hasEntryCode && eventData.entryCode) {
+        formData.append("entryCode", eventData.entryCode);
+      }
+      if (settings?.hasAttendeeLimit && eventData.attendeeLimit) {
+        formData.append("attendeeLimit", eventData.attendeeLimit);
+      }
+      // Append cohost images, one file per field named cohostImage_<index>,
+      // matching that cohost's position in eventData.cohosts. Cohosts with
+      // no new upload have `null` at their index in cohostImages and are
+      // skipped — the backend preserves their existing photo object instead.
+      if (settings?.hasCohosts && eventData.cohostImages?.length > 0) {
+        eventData.cohostImages.forEach((file, index) => {
+          if (file) formData.append(`cohostImage_${index}`, file);
+        });
       }
       return eventsApi.createEvent(formData);
     },
@@ -541,6 +568,7 @@ function CreateEvent() {
                           setEvent(prev => ({
                             ...prev,
                             cohosts: [],
+                            cohostImages: [],
                           }));
                           setSettings(prev => ({
                             ...prev,
@@ -902,8 +930,12 @@ function CreateEvent() {
       {/* Event cohosts modal */}
       <EventCohostsModal
         cohostsData={event.cohosts}
-        onSave={newCohosts => {
-          setEvent({ ...event, cohosts: newCohosts });
+        onSave={(newCohosts, cohostImages) => {
+          setEvent({
+            ...event,
+            cohosts: newCohosts,
+            cohostImages: cohostImages,
+          });
           setValidation(prev => ({ ...prev, cohosts: "" }));
         }}
       />
