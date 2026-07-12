@@ -15,7 +15,7 @@ import { useState } from "react";
 function Payments() {
   const { setUser, user } = useAuthStore();
   const [eventFeesPaidBy, setEventFeesPaidBy] = useState(
-    user.preferences?.eventFeesPaidBy || "organizer"
+    user.preferences?.eventFeesPaidBy || "host"
   );
   const [bankAccount, setBankAccount] = useState({
     bankName: user.bankDetails?.bankName || "",
@@ -139,12 +139,12 @@ function Payments() {
           </p>
         </div>
         <Toggle
-          checked={eventFeesPaidBy === "user"}
+          checked={eventFeesPaidBy === "guests"}
           onChange={() => {
-            if (eventFeesPaidBy === "organizer") {
-              setEventFeesPaidBy("user");
+            if (eventFeesPaidBy === "host") {
+              setEventFeesPaidBy("guests");
             } else {
-              setEventFeesPaidBy("organizer");
+              setEventFeesPaidBy("host");
             }
           }}
         />

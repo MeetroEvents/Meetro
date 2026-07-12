@@ -23,8 +23,6 @@ export default function DeleteEventModal({ eventId, showAlert = false }) {
       eventsApi.deleteEvent(eventId);
     },
     onSuccess: () => {
-      // Close modal
-      close();
       // Revalidate events list or update state as needed here
       queryClient.invalidateQueries(["user-events"]);
       queryClient.invalidateQueries(["event", eventId]);
@@ -34,6 +32,9 @@ export default function DeleteEventModal({ eventId, showAlert = false }) {
       setTimeout(() => {
         navigate("/home");
       }, 300);
+
+      // Close modal
+      close();
     },
     onError: error => {
       setError(error?.response?.data?.message || "Something went wrong.");

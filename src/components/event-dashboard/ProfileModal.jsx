@@ -180,14 +180,15 @@ export default function ProfileModal({ open, setOpen }) {
                 </NavLink>
               </li>
               <li>
-                <NavLink
+                <button
                   to="/contact"
-                  onClick={() => setOpen(false)}
-                  className={({ isActive }) =>
-                    `flex items-center gap-x-1 px-1 py-3 md:py-2 rounded-[8px] transition-colors hover:bg-[#F0F0F0] ${
-                      isActive ? "bg-[#F0F0F0]" : ""
-                    }`
-                  }
+                  onClick={() => {
+                    setOpen(false);
+                    // Open email client in new tab with pre-filled email address
+                    window.open("mailto:tech@meetrolive.com", "_blank");
+                  }}
+                  className={`flex w-full items-center gap-x-1 px-1 py-3 md:py-2 rounded-[8px] transition-colors hover:bg-[#F0F0F0] 
+                    }`}
                 >
                   <I24Support
                     size="32"
@@ -198,7 +199,7 @@ export default function ProfileModal({ open, setOpen }) {
                   <span className="text-sm font-bold md:font-medium md:text-[12px] leading-[18px]">
                     Contact us
                   </span>
-                </NavLink>
+                </button>
               </li>
             </ul>
           </div>
