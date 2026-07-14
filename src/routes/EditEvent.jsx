@@ -294,7 +294,6 @@ function EditEvent() {
   const [status, setStatus] = useState(null);
   // Error state
   const [error, setError] = useState(null);
-  // Update event mutation
   const { mutateAsync: updateEvent, isPending: isUpdating } = useMutation({
     mutationFn: () => {
       const formData = new FormData();
@@ -308,24 +307,20 @@ function EditEvent() {
         formData.append("endDate", new Date(editedEvent.endDate).toISOString());
       }
       if (settings?.hasCohosts) {
-        // Each cohost's `photo` (if kept) is the raw { public_id, url }
-        // object carried from editedEvent.cohosts — sent as-is so the
-        // backend preserves it when no new file is uploaded for that index.
         formData.append("cohosts", JSON.stringify(editedEvent.cohosts));
       }
       formData.append("category", JSON.stringify(editedEvent.category));
       formData.append("eventType", editedEvent.eventType);
-      // Append image if it exists
+
+      // Only send "image" when the user actually picked a new file.
+      // Omitting it signals "unchanged" to the backend.
       if (imageFile) {
         formData.append("image", imageFile);
-      } else {
-        formData.append("image", editedEvent.image);
       }
-      // Append description if it exists
+
       if (editedEvent.description) {
         formData.append("description", editedEvent.description);
       }
-      // Append optional fields
       if (editedEvent.chipInDetails && settings?.hasChipIn) {
         formData.append(
           "chipInDetails",
@@ -341,10 +336,6 @@ function EditEvent() {
       if (editedEvent.dressCode) {
         formData.append("dressCode", JSON.stringify(editedEvent.dressCode));
       }
-      // Append cohost images, one file per field named cohostImage_<index>,
-      // matching that cohost's position in editedEvent.cohosts. Cohosts
-      // with no new upload have `null` at their index and are skipped —
-      // the backend preserves their existing photo object instead.
       if (settings?.hasCohosts && cohostImages.length > 0) {
         cohostImages.forEach((file, index) => {
           if (file) formData.append(`cohostImage_${index}`, file);
@@ -354,15 +345,10 @@ function EditEvent() {
     },
     onSuccess: data => {
       if (data.status === "success") {
-        // Invalidate queries to refetch the updated data
         queryClient.invalidateQueries(["user-events"]);
         queryClient.invalidateQueries(["event", event._id]);
-
-        // Clear file
         setImageFile(null);
-        // Set status to success
         setStatus("success");
-        // Clear local images
         clearLocalImages();
       }
     },
@@ -375,12 +361,9 @@ function EditEvent() {
     },
   });
 
-  // Handle save changes
   const handleSaveChanges = () => {
-    if (!validateRequiredFields()) {
-      return;
-    }
-    updateEvent();
+    if (!validateRequiredFields()) return;
+    updateEvent().catch(() => {}); // errors already handled via onError; avoids unhandled rejection
     setActive("update-event");
   };
 

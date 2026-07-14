@@ -5,7 +5,7 @@ import {
   formatNaira,
 } from "@/lib/utils";
 import { paymentApi } from "@/services/paymentApi";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CloseCircle, ReceiveSquare2, TickCircle } from "iconsax-reactjs";
 import { useState } from "react";
 import { Link } from "react-router";
@@ -19,6 +19,9 @@ function WithdrawModal({ withdrawDetails }) {
   const [window, setWindow] = useState("withdraw");
   const [transactionDetail, setTransactionDetail] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+
+  // Query client for cache invalidation
+  const queryClient = useQueryClient();
 
   // Fee responsibility
   const feeResponsibility = withdrawDetails.feeResponsibility;
@@ -36,6 +39,14 @@ function WithdrawModal({ withdrawDetails }) {
       // Handle successful withdrawal
       setTransactionDetail(data.transaction);
       setWindow("transaction-success");
+
+      // Invalidate all necessary queries to refresh data
+      queryClient.invalidateQueries(["eventBalance", withdrawDetails.eventId]);
+      queryClient.invalidateQueries(["payouts", withdrawDetails.eventId]);
+      queryClient.invalidateQueries([
+        "event-protected",
+        withdrawDetails.eventId,
+      ]);
     },
     onError: error => {
       // Handle withdrawal error

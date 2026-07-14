@@ -5,6 +5,7 @@ import TagButton from "@/components/layout-components/Buttons/TagButton";
 import TextButton from "@/components/layout-components/Buttons/TextButtons";
 import WithdrawModal from "@/components/manage-event/WithdrawModal";
 import UpdateBankModal from "@/components/layout-components/Events/UpdateBankModal";
+import Modal from "@/components/layout-components/Modal/Modal";
 import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Navigate, useParams } from "react-router";
@@ -12,7 +13,6 @@ import { Bank, InfoCircle, RefreshCircle } from "iconsax-reactjs";
 import { paymentApi } from "@/services/paymentApi";
 import { useManageEventContext } from "@/layouts/ManageEventLayout";
 import { useModalContext } from "@/components/layout-components/Modal/ModalContext";
-import Modal from "@/components/layout-components/Modal/Modal";
 
 function Withdraw() {
   const { slug: eventId } = useParams();
