@@ -1,6 +1,7 @@
 import Alert from "@/components/layout-components/Alert";
 import TagButton from "@/components/layout-components/Buttons/TagButton";
 import TextButton from "@/components/layout-components/Buttons/TextButtons";
+import EventChipInModal from "@/components/layout-components/Events/EventChipInModal";
 import EventCohostsModal from "@/components/layout-components/Events/EventCohostsModal";
 import EventDateModal from "@/components/layout-components/Events/EventDateModal";
 import EventDescriptionModal from "@/components/layout-components/Events/EventDescriptionModal";
@@ -25,12 +26,26 @@ import {
   Category2,
   Colorfilter,
   Crown,
+  Gallery,
   Location,
   Timer1,
   Trash,
 } from "iconsax-reactjs";
 import React, { useEffect, useState } from "react";
 import { twMerge } from "tailwind-merge";
+
+// Fallback shape for chip-in details when a user removes chip-in and might
+// re-add it later in the same session. Mirrors CreateEvent's constant.
+const initialChipInDetails = {
+  chipInType: "",
+  amount: "",
+  bankDetails: {
+    accountName: "",
+    accountNumber: "",
+    bankName: "",
+    bankCode: "",
+  },
+};
 
 function EditEvent() {
   const { event } = useManageEventContext();
@@ -54,6 +69,9 @@ function EditEvent() {
   const queryClient = useQueryClient();
   // File state to hold the uploaded image file.
   const [imageFile, setImageFile] = useState(null);
+  // Cohost image files, index-matched to editedEvent.cohosts. null entries
+  // mean "no new upload for this cohost, keep their existing photo".
+  const [cohostImages, setCohostImages] = useState([]);
   // Show update count alert
   const [showUpdateAlert, setShowUpdateAlert] = useState(true);
 
@@ -70,6 +88,7 @@ function EditEvent() {
         endDate: event.endDate || "",
         image: event.image || "",
         font: event.font || "paytone",
+        isPrivate: Boolean(event.isPrivate),
         location: {
           venue: event.location?.venue || "",
           state: event.location?.state || "",
@@ -82,6 +101,12 @@ function EditEvent() {
         dressCode: event.dressCode || null,
         eventType: event.eventType || "",
         meetingURL: event.meetingURL || "",
+        // NOTE: cohosts here must include the RAW photo object
+        // ({ public_id, url }), not a flattened URL string, or existing
+        // cohost photos will be lost on save. This depends on
+        // useManageEventContext fetching the event via an edit-mode
+        // endpoint that doesn't flatten cohost.photo through
+        // formatEventData's public-view shape.
         cohosts: event.cohosts || [],
         updateCount: event.updateCount || 0,
         chipInDetails: event.chipInDetails || null,
@@ -89,6 +114,7 @@ function EditEvent() {
 
       setInitialEvent(eventData);
       setEditedEvent(eventData);
+      setCohostImages((eventData.cohosts || []).map(() => null));
 
       setSettings({
         hasDescription: eventData?.description ? true : false,
@@ -104,11 +130,14 @@ function EditEvent() {
       URL.revokeObjectURL(editedEvent.image);
     }
 
-    // Also check cohosts for any blob URLs and revoke them
+    // Also check cohosts for any blob preview URLs and revoke them.
+    // cohost.photo is the { public_id, url } object from the server (or
+    // undefined) — never a blob URL. The local preview lives in
+    // cohost.preview, set by ImageInput's onUpload in EventCohostsModal.
     if (editedEvent?.cohosts?.length) {
       editedEvent.cohosts.forEach(cohost => {
-        if (cohost.photo && cohost.photo.startsWith("blob:")) {
-          URL.revokeObjectURL(cohost.photo);
+        if (cohost.preview && cohost.preview.startsWith("blob:")) {
+          URL.revokeObjectURL(cohost.preview);
         }
       });
     }
@@ -167,6 +196,7 @@ function EditEvent() {
   // Undo changes handler
   const handleUndoChanges = () => {
     setEditedEvent(initialEvent);
+    setCohostImages((initialEvent.cohosts || []).map(() => null));
     setSettings({
       hasDescription: initialEvent.description ? true : false,
       hasChipIn: initialEvent.chipInDetails ? true : false,
@@ -204,6 +234,17 @@ function EditEvent() {
     ? editedEvent.description.length > 50
       ? editedEvent.description.slice(0, 50) + "..."
       : editedEvent.description
+    : "";
+
+  // Format chip in details for display
+  const chipInDetailsFormatted = event?.chipInDetails
+    ? event.chipInDetails?.chipInType === "fixed"
+      ? `Fixed - ₦${event.chipInDetails?.amount}`
+      : event.chipInDetails?.chipInType === "target"
+        ? `Target - ₦${event.chipInDetails?.amount}`
+        : event.chipInDetails?.chipInType === "donation"
+          ? `Flexible - ₦${event.chipInDetails?.amount}`
+          : ""
     : "";
 
   // Format cohosts for display in ListInput
@@ -253,7 +294,6 @@ function EditEvent() {
   const [status, setStatus] = useState(null);
   // Error state
   const [error, setError] = useState(null);
-  // Update event mutation
   const { mutateAsync: updateEvent, isPending: isUpdating } = useMutation({
     mutationFn: () => {
       const formData = new FormData();
@@ -271,17 +311,16 @@ function EditEvent() {
       }
       formData.append("category", JSON.stringify(editedEvent.category));
       formData.append("eventType", editedEvent.eventType);
-      // Append image if it exists
+
+      // Only send "image" when the user actually picked a new file.
+      // Omitting it signals "unchanged" to the backend.
       if (imageFile) {
         formData.append("image", imageFile);
-      } else {
-        formData.append("image", editedEvent.image);
       }
-      // Append description if it exists
+
       if (editedEvent.description) {
         formData.append("description", editedEvent.description);
       }
-      // Append optional fields
       if (editedEvent.chipInDetails && settings?.hasChipIn) {
         formData.append(
           "chipInDetails",
@@ -297,19 +336,19 @@ function EditEvent() {
       if (editedEvent.dressCode) {
         formData.append("dressCode", JSON.stringify(editedEvent.dressCode));
       }
+      if (settings?.hasCohosts && cohostImages.length > 0) {
+        cohostImages.forEach((file, index) => {
+          if (file) formData.append(`cohostImage_${index}`, file);
+        });
+      }
       return eventsApi.updateEvent(event._id, formData);
     },
     onSuccess: data => {
       if (data.status === "success") {
-        // Invalidate queries to refetch the updated data
         queryClient.invalidateQueries(["user-events"]);
         queryClient.invalidateQueries(["event", event._id]);
-
-        // Clear file
         setImageFile(null);
-        // Set status to success
         setStatus("success");
-        // Clear local images
         clearLocalImages();
       }
     },
@@ -322,12 +361,9 @@ function EditEvent() {
     },
   });
 
-  // Handle save changes
   const handleSaveChanges = () => {
-    if (!validateRequiredFields()) {
-      return;
-    }
-    updateEvent();
+    if (!validateRequiredFields()) return;
+    updateEvent().catch(() => {}); // errors already handled via onError; avoids unhandled rejection
     setActive("update-event");
   };
 
@@ -515,6 +551,35 @@ function EditEvent() {
               />
             </Modal.Open>
           )}
+          {/* Event chip in */}
+          {settings?.hasChipIn && editedEvent.isPrivate && (
+            <Modal.Open opens="event-chip-in">
+              <ListInput
+                placeholder="Chip In"
+                content={chipInDetailsFormatted}
+                error={validation.chipIn}
+                leftIcon={<Gallery variant="Bold" />}
+                rightIcon={
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      setEditedEvent(prev => ({
+                        ...prev,
+                        chipInDetails: initialChipInDetails,
+                      }));
+                      setSettings(prev => ({
+                        ...prev,
+                        hasChipIn: false,
+                      }));
+                      setValidation(prev => ({ ...prev, chipIn: "" }));
+                    }}
+                  >
+                    <Trash variant="Outline" size={16} />
+                  </button>
+                }
+              />
+            </Modal.Open>
+          )}
           {/* Optional fields based on settings */}
           {hasNoSettings && (
             <div className="flex items-center gap-x-4 gap-y-3">
@@ -531,19 +596,6 @@ function EditEvent() {
                   leftImg={<Add />}
                 />
               )}
-              {/* {!settings?.hasChipIn && (
-                <TagButton
-                  text="Chip In"
-                  leftImg={<Add />}
-                  className="satoshi"
-                  onClick={() => {
-                    setSettings(prev => ({
-                      ...prev,
-                      hasChipIn: !prev.hasChipIn,
-                    }));
-                  }}
-                />
-              )} */}
               {!settings?.hasCohosts && (
                 <TagButton
                   text="Cohosts"
@@ -642,8 +694,9 @@ To keep things neat for your guests, you can only make up to 3 major edits (like
       {/* Event cohosts modal */}
       <EventCohostsModal
         cohostsData={editedEvent.cohosts}
-        onSave={newCohosts => {
+        onSave={(newCohosts, newCohostImages) => {
           setEditedEvent({ ...editedEvent, cohosts: newCohosts });
+          setCohostImages(newCohostImages);
           setValidation(prev => ({ ...prev, cohosts: "" }));
         }}
       />
@@ -672,6 +725,16 @@ To keep things neat for your guests, you can only make up to 3 major edits (like
           onSave={data => {
             setEditedEvent({ ...editedEvent, dressCode: data });
             setValidation(prev => ({ ...prev, dressCode: "" }));
+          }}
+        />
+      )}
+      {/* Event chip in modal */}
+      {settings.hasChipIn && editedEvent.isPrivate && (
+        <EventChipInModal
+          chipInData={editedEvent.chipInDetails}
+          onSave={data => {
+            setEditedEvent({ ...editedEvent, chipInDetails: data });
+            setValidation(prev => ({ ...prev, chipIn: "" }));
           }}
         />
       )}

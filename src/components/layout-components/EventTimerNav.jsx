@@ -1,5 +1,6 @@
 // src/components/layout-components/EventTimerNav.jsx (or wherever your components live)
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { Link, useLocation } from "react-router";
 
 // You can export this one too if you want to use it independently elsewhere
 export const DigitalTime = ({ time, unit }) => {
@@ -23,6 +24,9 @@ const EventTimerNav = ({ targetDate, onClick }) => {
     minutes: 0,
     seconds: 0,
   });
+
+  const location = useLocation();
+  const pathname = useMemo(() => location.pathname, [location.pathname]);
 
   useEffect(() => {
     if (!targetDate) return;
@@ -53,12 +57,14 @@ const EventTimerNav = ({ targetDate, onClick }) => {
 
   return (
     <nav className="bg-[#011F0F] w-full px-4 sm:px-8 py-3 flex items-center gap-4 flex-shrink-0">
-      <img
-        src="/logosmall.svg"
-        alt="Logo"
-        className="w-[30px]"
-        onClick={onClick}
-      />
+      {pathname.startsWith("/events/") ? (
+        <Link to="/home">
+          <img src="/logosmall.svg" alt="Logo" className="w-[30px]" />
+        </Link>
+      ) : (
+        <img src="/logosmall.svg" alt="Logo" className="w-[30px]" />
+      )}
+
       <div className="w-full flex justify-end gap-x-4 items-center flex-wrap">
         <span className="text-xs sm:text-lg font-normal paytone text-[#55695E]">
           {targetDate && new Date(targetDate) > new Date()

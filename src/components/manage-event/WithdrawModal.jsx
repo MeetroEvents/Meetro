@@ -1,6 +1,11 @@
-import { formatCurrency, formatDate, formatNaira } from "@/lib/utils";
+import {
+  calculateFee,
+  formatCurrency,
+  formatDate,
+  formatNaira,
+} from "@/lib/utils";
 import { paymentApi } from "@/services/paymentApi";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CloseCircle, ReceiveSquare2, TickCircle } from "iconsax-reactjs";
 import { useState } from "react";
 import { Link } from "react-router";
@@ -9,18 +14,17 @@ import TextButton from "../layout-components/Buttons/TextButtons";
 import Modal from "../layout-components/Modal/Modal";
 import LoadingSpinner from "../layout-components/LoadingSpinner";
 
-// Calculate withdrawal fee
-export function calculateFee(amount) {
-  const feePercentage = 0.01;
-  const fixedFee = 100; // NGN 100 fixed fee
-  return amount * feePercentage + fixedFee;
-}
-
 function WithdrawModal({ withdrawDetails }) {
   // Active window
   const [window, setWindow] = useState("withdraw");
   const [transactionDetail, setTransactionDetail] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+
+  // Query client for cache invalidation
+  const queryClient = useQueryClient();
+
+  // Fee responsibility
+  const feeResponsibility = withdrawDetails.feeResponsibility;
 
   // Calculate fees
   const fees = calculateFee(withdrawDetails.withdrawalAmount);
@@ -35,6 +39,14 @@ function WithdrawModal({ withdrawDetails }) {
       // Handle successful withdrawal
       setTransactionDetail(data.transaction);
       setWindow("transaction-success");
+
+      // Invalidate all necessary queries to refresh data
+      queryClient.invalidateQueries(["eventBalance", withdrawDetails.eventId]);
+      queryClient.invalidateQueries(["payouts", withdrawDetails.eventId]);
+      queryClient.invalidateQueries([
+        "event-protected",
+        withdrawDetails.eventId,
+      ]);
     },
     onError: error => {
       // Handle withdrawal error
@@ -95,12 +107,16 @@ function WithdrawModal({ withdrawDetails }) {
                     {withdrawDetails.bankName}
                   </p>
                 </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-[#8A9191] whitespace-nowrap">Fees</span>
-                  <p className="overflow-hidden overflow-ellipsis whitespace-nowrap">
-                    {formatNaira(fees)}
-                  </p>
-                </div>
+                {feeResponsibility === "host" && (
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[#8A9191] whitespace-nowrap">
+                      Fees
+                    </span>
+                    <p className="overflow-hidden overflow-ellipsis whitespace-nowrap">
+                      {formatNaira(fees)}
+                    </p>
+                  </div>
+                )}
               </div>
               <div className="flex flex-col gap-y-4">
                 {/* Withdraw button */}
@@ -159,14 +175,17 @@ function WithdrawModal({ withdrawDetails }) {
                       {transactionDetail?.bankDetails?.bankName}
                     </p>
                   </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-[#8A9191] whitespace-nowrap">
-                      Fees
-                    </span>
-                    <p className="overflow-hidden overflow-ellipsis whitespace-nowrap">
-                      {formatNaira(transactionDetail?.fees)}
-                    </p>
-                  </div>
+                  {feeResponsibility === "host" && (
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-[#8A9191] whitespace-nowrap">
+                        Fees
+                      </span>
+                      <p className="overflow-hidden overflow-ellipsis whitespace-nowrap">
+                        {formatNaira(fees)}
+                      </p>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between gap-4">
                     <span className="text-[#8A9191] whitespace-nowrap">
                       Date

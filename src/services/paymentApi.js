@@ -8,8 +8,12 @@ export const paymentApi = {
 
     return transactionsResponse.data;
   },
-  updateBankDetails: async data => {
-    const updateResponse = await API.patch(`/payments/update-bank`, data);
+  updateUserBankDetails: async data => {
+    const updateResponse = await API.patch(`/payments/update-user-bank`, data);
+    return updateResponse.data.data;
+  },
+  updateEventBankDetails: async data => {
+    const updateResponse = await API.patch(`/payments/update-event-bank`, data);
     return updateResponse.data.data;
   },
   getEventBalance: async eventId => {
