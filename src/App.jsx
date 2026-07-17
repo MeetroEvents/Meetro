@@ -20,6 +20,7 @@ import Terms from "./routes/legal/Terms";
 import LegalLayout from "./layouts/LegalLayout";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { useRehydrateUser } from "./hooks/useRehydrateUser";
+import VerifyPayment from "./routes/VerifyPayment";
 import CreateEvent from "./routes/CreateEvent";
 import EventPreview from "./routes/CreateEventPreview";
 import Profile from "./routes/Profile";
@@ -49,6 +50,8 @@ function App() {
           <Route path="/data" element={<Data />} />
           <Route path="/terms" element={<Terms />} />
         </Route>
+        {/* Payment Verification */}
+        <Route path="/verify-payment" element={<VerifyPayment />} />
         {/* Reset password */}
         <Route path="/reset-password" element={<ResetPassword />} />
         {/* Protected Routes */}

@@ -41,4 +41,10 @@ export const paymentApi = {
     });
     return chipInResponse.data.data;
   },
+  verifyPayment: async reference => {
+    const verifyResponse = await API.get(
+      `/payments/verify-payment/?reference=${reference}`
+    );
+    return verifyResponse.data;
+  },
 };
