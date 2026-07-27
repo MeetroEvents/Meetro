@@ -224,7 +224,7 @@ export default function EventDetails() {
     // navigate to the same page without the shared param
     navigate(`/events/${event.slug}`, { replace: true });
     setShowMoreDetails(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: "instant" });
   };
 
   useEffect(() => {

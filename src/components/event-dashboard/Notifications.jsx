@@ -4,10 +4,17 @@ import { useDisableScroll } from "@/hooks/useDisableScroll";
 import { timeAgo } from "@/lib/utils";
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router";
+import { useNotificationStore } from "@/stores/useNotificationStore";
+import { notificationsApi } from "@/services/notificationsApi";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-export default function Notifications({ notifications = [], open, setOpen }) {
+export default function Notifications({ open, setOpen }) {
+  const { notifications, removeNotification, clearNotifications } =
+    useNotificationStore();
   // IsMobile
   const [isMobile, setIsMobile] = useState(false);
+
+  const queryClient = useQueryClient();
 
   // Ref for the notifications container
   const notificationsRef = useRef(null);
@@ -17,6 +24,49 @@ export default function Notifications({ notifications = [], open, setOpen }) {
 
   // Navigate hook
   const navigate = useNavigate();
+
+  const { mutate: markAsRead } = useMutation({
+    mutationFn: async notificationId =>
+      notificationsApi.markAsRead(notificationId),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+
+  const { mutate: markAllAsRead } = useMutation({
+    mutationFn: async () => notificationsApi.markAllAsRead(),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+
+  const handleNotificationNavigate = notification => {
+    markAsRead(notification.id);
+    let url = `/manage-event/${notification.raw.eventSlug}`;
+    switch (notification.raw.type) {
+      case "rsvp":
+        url += `?tab=guests`;
+        break;
+      case "chipin":
+        url += "?tab=payouts";
+        break;
+      default:
+        break;
+    }
+    // Close notifications box
+    setOpen(false);
+
+    // Remove notification from store
+    removeNotification(notification.id);
+
+    // Navigate to event
+    navigate(url);
+  };
+
+  const handleClearNotifications = () => {
+    markAllAsRead();
+    clearNotifications();
+  };
 
   // Track mobile state on resize
   useEffect(() => {
@@ -51,7 +101,7 @@ export default function Notifications({ notifications = [], open, setOpen }) {
       {/* Top */}
       <div className="flex justify-between items-center p-4 pb-2 bg-[#F4F4F4]">
         <h3 className="text-[#001010] text-sm font-bold">Notifications</h3>
-        <button className="cursor-pointer" onClick={() => setOpen(false)}>
+        <button className="cursor-pointer" onClick={handleClearNotifications}>
           <CloseIcon size={24} />
         </button>
       </div>
@@ -61,13 +111,7 @@ export default function Notifications({ notifications = [], open, setOpen }) {
           <div className="flex flex-col">
             {notifications.map((item, i) => (
               <div
-                onClick={() => {
-                  // Close notifications box
-                  setOpen(false);
-
-                  // Navigate to event
-                  navigate(item.url);
-                }}
+                onClick={() => handleNotificationNavigate(item)}
                 key={i}
                 className="p-4 pb-2 flex flex-col gap-y-1 cursor-pointer transition-all hover:bg-[#F0F0F0] border border-white"
               >
@@ -75,24 +119,24 @@ export default function Notifications({ notifications = [], open, setOpen }) {
                 <div className="flex items-start gap-2">
                   <div className="h-[26px] min-w-[29px] rounded-[8px] overflow-hidden">
                     <img
-                      src={item.img}
+                      src={item.raw.image}
                       className="object-cover block h-full w-full"
                       alt="event-img"
                     />
                   </div>
                   <div>
                     <h3 className="text-sm font-medium text-[#001010]">
-                      {item.title}
+                      {item.raw.title}
                     </h3>
                     <p className="font-medium text-[#8A9191] text-[12px] leading-[18px]">
-                      {item.text}
+                      {item.raw.message}
                     </p>
                   </div>
                 </div>
                 {/* Notification bottom */}
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-[#8A9191] text-[12px] leading-[18px]">
-                    {timeAgo(item.createdAt)}
+                    {timeAgo(item.raw.createdAt)}
                   </span>
                   <TextButton text="View" className="min-w-0!" smallButton />
                 </div>
