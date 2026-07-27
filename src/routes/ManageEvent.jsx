@@ -16,12 +16,14 @@ function ManageEvent() {
     });
   }, [location]);
 
+  const hasChipIn = event?.chipInDetails ?? false;
+
   const renderTabContent = () => {
     switch (tab) {
       case "overview":
         return <OverviewTab />;
       case "guests":
-        return <GuestsTab isPaidEvent={event.chipInDetails ? true : false} />;
+        return <GuestsTab isPaidEvent={hasChipIn ? true : false} />;
       case "payouts":
         return <PayoutsTab />;
       default:
