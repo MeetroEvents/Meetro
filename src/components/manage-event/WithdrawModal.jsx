@@ -8,7 +8,7 @@ import { paymentApi } from "@/services/paymentApi";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CloseCircle, ReceiveSquare2, TickCircle } from "iconsax-reactjs";
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import IconButton from "../layout-components/Buttons/IconButton";
 import TextButton from "../layout-components/Buttons/TextButtons";
 import Modal from "../layout-components/Modal/Modal";
@@ -19,6 +19,7 @@ function WithdrawModal({ withdrawDetails }) {
   const [window, setWindow] = useState("withdraw");
   const [transactionDetail, setTransactionDetail] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const navigate = useNavigate();
 
   // Query client for cache invalidation
   const queryClient = useQueryClient();
@@ -63,6 +64,10 @@ function WithdrawModal({ withdrawDetails }) {
     setWindow("withdraw");
     setErrorMessage("");
     setTransactionDetail(null);
+  };
+
+  const handleBackToPayouts = () => {
+    navigate(`/manage-event/${withdrawDetails.eventId}?tab=payouts`);
   };
 
   const renderContent = () => {
@@ -197,7 +202,7 @@ function WithdrawModal({ withdrawDetails }) {
                 </div>
               </div>
               <div className="flex items-center justify-center md:justify-start gap-x-4">
-                <TextButton text="Back to home" />
+                <TextButton text="Back to home" onClick={handleBackToPayouts} />
               </div>
             </div>
           </div>
@@ -262,7 +267,12 @@ function WithdrawModal({ withdrawDetails }) {
       isCloseButtonDisabled={loading}
       name="withdrawal-confirm"
       title={window !== "withdraw" ? "Transaction Detail" : ""}
-      onClose={resetWindow}
+      onClose={() => {
+        resetWindow();
+        if (window == "transaction-success") {
+          handleBackToPayouts();
+        }
+      }}
     >
       {renderContent()}
     </Modal.Window>
