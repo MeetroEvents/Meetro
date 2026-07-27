@@ -1,5 +1,10 @@
 import MeetroLogoAlt from "@/assets/icons/MeetroLogoAlt";
 import MeetroLogoAltMobile from "@/assets/icons/MeetroLogoAltMobile";
+import Notifications from "../event-dashboard/Notifications";
+import ProfileModal from "../event-dashboard/ProfileModal";
+import Avatar from "../layout-components/Avatar";
+import IconButton from "../layout-components/Buttons/IconButton";
+import TagButton from "../layout-components/Buttons/TagButton";
 import { useManageEventData } from "@/layouts/ManageEventLayout";
 import { useAuthStore } from "@/stores/useAuthStore";
 import {
@@ -13,11 +18,8 @@ import {
 import { useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { twMerge } from "tailwind-merge";
-import Notifications from "../event-dashboard/Notifications";
-import ProfileModal from "../event-dashboard/ProfileModal";
-import Avatar from "../layout-components/Avatar";
-import IconButton from "../layout-components/Buttons/IconButton";
-import TagButton from "../layout-components/Buttons/TagButton";
+import { useNotificationStore } from "@/stores/useNotificationStore";
+import { useNotifications } from "@/hooks/useNotifications";
 
 function ManageEventHeader() {
   // Notifications state
@@ -29,6 +31,9 @@ function ManageEventHeader() {
   const tab = searchParams.get("tab") || "overview";
   const { user } = useAuthStore();
   const { event: activeEvent, loading: isLoading } = useManageEventData();
+  const { unreadCount } = useNotificationStore();
+
+  useNotifications();
 
   // Determine if we should show the bottom nav based on URL path
   const showNav =
@@ -93,6 +98,11 @@ function ManageEventHeader() {
                 }}
                 className={`${openNotifications ? "bg-[#E5E7E3]! pointer-events-none" : ""} size-9!`}
               />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#BCFF5C] px-1 text-[10px] font-bold text-[#001010]">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
             </div>
             <Notifications
               open={openNotifications}
@@ -190,7 +200,7 @@ function ManageEventHeader() {
                 )}
                 onClick={() => handleTabChange("guests")}
               />
-              {(activeEvent?.chipInDetails || isLoading) && (
+              {activeEvent?.chipInDetails && (
                 <TagButton
                   text="Payouts"
                   size="md"

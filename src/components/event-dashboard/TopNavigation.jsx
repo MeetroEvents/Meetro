@@ -7,14 +7,19 @@ import MeetroLogoAltMobile from "@/assets/icons/MeetroLogoAltMobile";
 import { useState, useEffect } from "react";
 import { ArrowDown2, ArrowUp2, Map1, Notification } from "iconsax-reactjs";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { useNotificationStore } from "@/stores/useNotificationStore";
 import { twMerge } from "tailwind-merge";
 import { Link } from "react-router";
+import { useNotifications } from "@/hooks/useNotifications";
 
 // Notifications
 export default function TopNavigation() {
   // Notifications state
   const [openNotifications, setOpenNotifications] = useState(false);
   const { user } = useAuthStore();
+  const { unreadCount } = useNotificationStore();
+
+  useNotifications();
 
   // Profile modal state
   const [openProfile, setOpenProfile] = useState(false);
@@ -83,6 +88,11 @@ export default function TopNavigation() {
                 }}
                 className={`${openNotifications ? "bg-[#E5E7E3]! pointer-events-none" : ""} size-9!`}
               />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#BCFF5C] px-1 text-[10px] font-bold text-[#001010]">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
             </div>
             <Notifications
               open={openNotifications}
