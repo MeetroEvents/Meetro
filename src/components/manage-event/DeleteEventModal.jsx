@@ -18,9 +18,9 @@ export default function DeleteEventModal({ eventId, showAlert = false }) {
   const [error, setError] = useState(null);
 
   const { mutate: deleteEvent, isPending: loading } = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       setError(null);
-      eventsApi.deleteEvent(eventId);
+      return await eventsApi.deleteEvent(eventId);
     },
     onSuccess: () => {
       // Revalidate events list or update state as needed here
@@ -76,7 +76,7 @@ export default function DeleteEventModal({ eventId, showAlert = false }) {
           <TextButton
             variant="red"
             text={loading ? <LoadingSpinner /> : "Yes, Delete"}
-            onClick={() => deleteEvent()}
+            onClick={deleteEvent}
             className="min-w-[106px]"
             disabled={loading}
           />
