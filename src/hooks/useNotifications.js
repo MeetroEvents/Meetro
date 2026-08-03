@@ -40,21 +40,22 @@ export function useNotifications() {
     socket.onmessage = event => {
       try {
         const payload = JSON.parse(event.data);
+        const eventSlug =
+          payload?.notification?.eventSlug || payload?.raw?.eventSlug;
+        const notificationType = payload?.notification?.type;
+
         useNotificationStore.getState().addNotification(payload);
-        // Invalidate necessary event queries
-        queryClient.invalidateQueries(["user-events"]);
-        queryClient.invalidateQueries([
-          "event-protected",
-          payload.raw.eventSlug,
-        ]);
-        queryClient.invalidateQueries(["event", payload.raw.eventSlug]);
-        queryClient.invalidateQueries(["guests", payload.raw.eventSlug]);
-        if (payload.raw.type === "chipin") {
-          queryClient.invalidateQueries([
-            "eventBalance",
-            payload.raw.eventSlug,
-          ]);
-          queryClient.invalidateQueries(["payouts", payload.raw.eventSlug]);
+
+        if (eventSlug) {
+          // Invalidate necessary event queries
+          queryClient.invalidateQueries(["user-events"]);
+          queryClient.invalidateQueries(["event-protected", eventSlug]);
+          queryClient.invalidateQueries(["event", eventSlug]);
+          queryClient.invalidateQueries(["guests", eventSlug]);
+          if (notificationType === "chipin") {
+            queryClient.invalidateQueries(["eventBalance", eventSlug]);
+            queryClient.invalidateQueries(["payouts", eventSlug]);
+          }
         }
       } catch (error) {
         console.error("Failed to parse notification payload", error);
@@ -66,7 +67,6 @@ export function useNotifications() {
     };
 
     socket.onclose = event => {
-      console.log(event);
       console.log("WS closed", event.code, event.reason);
     };
 

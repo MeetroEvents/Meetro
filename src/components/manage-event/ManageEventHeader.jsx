@@ -38,7 +38,7 @@ function ManageEventHeader() {
   // Determine if we should show the bottom nav based on URL path
   const showNav =
     !location.pathname.includes("edit-event") &&
-    !location.pathname.includes("withdraw");
+    location.pathname.split("/").filter(Boolean).at(-1) !== "withdraw";
 
   // Handle tab change by updating URL search params
   const handleTabChange = value => {
